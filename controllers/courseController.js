@@ -13,10 +13,7 @@ exports.uploadCourse = async (req, res) => {
       return res.status(400).json({ message: 'Course video file is required' });
     }
 
-    // Construct local video URL
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const videoUrl = `${protocol}://${host}/public/uploads/videos/${req.file.filename}`;
+    const videoUrl = req.file.location;
 
     const course = new Course({
       title,
