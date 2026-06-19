@@ -1,14 +1,25 @@
-FROM node:20
+FROM node:22-alpine AS deps
 
 WORKDIR /app
-
 COPY package*.json ./
+RUN npm ci --omit=dev
 
-RUN npm install
+FROM node:22-alpine AS runner
 
-COPY . .
+WORKDIR /app
+ENV NODE_ENV=production
 
-# Expose port 5007
+COPY --from=deps /app/node_modules ./node_modules
+COPY package*.json ./
+COPY server.js ./
+COPY controllers ./controllers
+COPY middleware ./middleware
+COPY models ./models
+COPY routes ./routes
+COPY utils ./utils
+COPY public ./public
+
+USER node
 EXPOSE 5007
 
-CMD ["node", "server.js"]
+CMD ["npm", "start"]
