@@ -5,7 +5,7 @@ const { authMiddleware, authorize } = require('../middleware/authMiddleware');
 const { uploadCourseVideo } = require('../middleware/uploadMiddleware');
 
 // Admin and hospital route to upload a course
-router.post('/', uploadCourseVideo.single('video'), courseController.uploadCourse);
+router.post('/', authMiddleware, authorize('admin', 'hospital'), uploadCourseVideo.single('video'), courseController.uploadCourse);
 
 // Get all courses (authenticated users)
 router.get('/', authMiddleware, courseController.getAllCourses);
