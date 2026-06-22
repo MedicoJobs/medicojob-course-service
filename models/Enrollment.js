@@ -4,7 +4,7 @@ const enrollmentSchema = new mongoose.Schema({
   userId: { type: String, required: true }, // The user's ID from user-service
   userName: { type: String, required: true },
   userEmail: { type: String, required: true },
-  courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
+  courseId: { type: String, required: true },
   completedAt: { type: Date, default: Date.now },
   certificateUrl: { type: String }, // Optional: If we save the cert somewhere, else just email
 }, { timestamps: true });
