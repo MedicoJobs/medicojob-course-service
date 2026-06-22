@@ -72,14 +72,6 @@ class QueryResult {
       });
     });
   }
-
-  then(resolve, reject) {
-    return this.itemsPromise.then(resolve, reject);
-  }
-
-  catch(reject) {
-    return this.itemsPromise.catch(reject);
-  }
 }
 
 class Course {
