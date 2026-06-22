@@ -1,51 +1,9 @@
 const crypto = require('node:crypto');
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const {
-  DynamoDBDocumentClient,
-  GetCommand,
-  PutCommand,
-  ScanCommand,
-} = require('@aws-sdk/lib-dynamodb');
+const { GetCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { getDynamoClient, clone, normalize, scanAll } = require('../utils/dynamo');
 
 const TABLE_NAME = process.env.DYNAMODB_COURSES_TABLE || 'medicojobs-courses';
-const AWS_REGION = process.env.AWS_REGION || 'ap-south-1';
-
-const client = DynamoDBDocumentClient.from(new DynamoDBClient({ region: AWS_REGION }), {
-  marshallOptions: {
-    removeUndefinedValues: true,
-  },
-});
-
-const clone = (value) => structuredClone(value);
-
-const normalize = (item) => {
-  if (!item) {
-    return null;
-  }
-
-  return {
-    ...item,
-    id: item.id,
-    _id: item.id,
-  };
-};
-
-const scanAll = async () => {
-  const items = [];
-  let ExclusiveStartKey;
-
-  do {
-    const response = await client.send(new ScanCommand({
-      TableName: TABLE_NAME,
-      ExclusiveStartKey,
-    }));
-
-    items.push(...(response.Items || []));
-    ExclusiveStartKey = response.LastEvaluatedKey;
-  } while (ExclusiveStartKey);
-
-  return items.map(normalize);
-};
+const client = getDynamoClient();
 
 class QueryResult {
   constructor(itemsPromise) {
@@ -106,7 +64,7 @@ class Course {
   }
 
   static find() {
-    return new QueryResult(scanAll());
+    return new QueryResult(scanAll(client, TABLE_NAME));
   }
 
   static async findById(id) {

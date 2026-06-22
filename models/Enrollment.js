@@ -1,50 +1,9 @@
 const crypto = require('node:crypto');
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const {
-  DynamoDBDocumentClient,
-  PutCommand,
-  ScanCommand,
-} = require('@aws-sdk/lib-dynamodb');
+const { PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { getDynamoClient, clone, normalize, scanAll } = require('../utils/dynamo');
 
 const TABLE_NAME = process.env.DYNAMODB_ENROLLMENTS_TABLE || 'medicojobs-enrollments';
-const AWS_REGION = process.env.AWS_REGION || 'ap-south-1';
-
-const client = DynamoDBDocumentClient.from(new DynamoDBClient({ region: AWS_REGION }), {
-  marshallOptions: {
-    removeUndefinedValues: true,
-  },
-});
-
-const clone = (value) => structuredClone(value);
-
-const normalize = (item) => {
-  if (!item) {
-    return null;
-  }
-
-  return {
-    ...item,
-    id: item.id,
-    _id: item.id,
-  };
-};
-
-const scanAll = async () => {
-  const items = [];
-  let ExclusiveStartKey;
-
-  do {
-    const response = await client.send(new ScanCommand({
-      TableName: TABLE_NAME,
-      ExclusiveStartKey,
-    }));
-
-    items.push(...(response.Items || []));
-    ExclusiveStartKey = response.LastEvaluatedKey;
-  } while (ExclusiveStartKey);
-
-  return items.map(normalize);
-};
+const client = getDynamoClient();
 
 class Enrollment {
   constructor(data = {}) {
@@ -79,7 +38,7 @@ class Enrollment {
   }
 
   static async findOne(query = {}) {
-    const enrollments = await scanAll();
+    const enrollments = await scanAll(client, TABLE_NAME);
     
     return enrollments.find(enrollment => {
       return Object.entries(query).every(([key, value]) => {
