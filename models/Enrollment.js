@@ -1,15 +1,51 @@
-const mongoose = require('mongoose');
+const crypto = require('node:crypto');
+const { PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { getDynamoClient, clone, normalize, scanAll } = require('../utils/dynamo');
 
-const enrollmentSchema = new mongoose.Schema({
-  userId: { type: String, required: true }, // The user's ID from user-service
-  userName: { type: String, required: true },
-  userEmail: { type: String, required: true },
-  courseId: { type: String, required: true },
-  completedAt: { type: Date, default: Date.now },
-  certificateUrl: { type: String }, // Optional: If we save the cert somewhere, else just email
-}, { timestamps: true });
+const TABLE_NAME = process.env.DYNAMODB_ENROLLMENTS_TABLE || 'medicojobs-enrollments';
+const client = getDynamoClient();
 
-// Prevent duplicate enrollments for the same course by the same user
-enrollmentSchema.index({ userId: 1, courseId: 1 }, { unique: true });
+class Enrollment {
+  constructor(data = {}) {
+    Object.assign(this, clone(data));
+    this.id = this.id || this._id || crypto.randomUUID();
+    this._id = this.id;
+  }
 
-module.exports = mongoose.model('Enrollment', enrollmentSchema);
+  async save() {
+    const now = new Date().toISOString();
+    const item = {
+      ...clone(this),
+      id: this.id,
+      completedAt: this.completedAt || now,
+      createdAt: this.createdAt || now,
+      updatedAt: now,
+    };
+
+    delete item._id;
+
+    await client.send(new PutCommand({
+      TableName: TABLE_NAME,
+      Item: item,
+    }));
+
+    Object.assign(this, normalize(item));
+    return this;
+  }
+
+  toJSON() {
+    return normalize(clone(this));
+  }
+
+  static async findOne(query = {}) {
+    const enrollments = await scanAll(client, TABLE_NAME);
+    
+    return enrollments.find(enrollment => {
+      return Object.entries(query).every(([key, value]) => {
+        return enrollment[key] === value;
+      });
+    }) || null;
+  }
+}
+
+module.exports = Enrollment;
