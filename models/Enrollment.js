@@ -1,15 +1,92 @@
-const mongoose = require('mongoose');
+const crypto = require('node:crypto');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const {
+  DynamoDBDocumentClient,
+  PutCommand,
+  ScanCommand,
+} = require('@aws-sdk/lib-dynamodb');
 
-const enrollmentSchema = new mongoose.Schema({
-  userId: { type: String, required: true }, // The user's ID from user-service
-  userName: { type: String, required: true },
-  userEmail: { type: String, required: true },
-  courseId: { type: String, required: true },
-  completedAt: { type: Date, default: Date.now },
-  certificateUrl: { type: String }, // Optional: If we save the cert somewhere, else just email
-}, { timestamps: true });
+const TABLE_NAME = process.env.DYNAMODB_ENROLLMENTS_TABLE || 'medicojobs-enrollments';
+const AWS_REGION = process.env.AWS_REGION || 'ap-south-1';
 
-// Prevent duplicate enrollments for the same course by the same user
-enrollmentSchema.index({ userId: 1, courseId: 1 }, { unique: true });
+const client = DynamoDBDocumentClient.from(new DynamoDBClient({ region: AWS_REGION }), {
+  marshallOptions: {
+    removeUndefinedValues: true,
+  },
+});
 
-module.exports = mongoose.model('Enrollment', enrollmentSchema);
+const clone = (value) => structuredClone(value);
+
+const normalize = (item) => {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    ...item,
+    id: item.id,
+    _id: item.id,
+  };
+};
+
+const scanAll = async () => {
+  const items = [];
+  let ExclusiveStartKey;
+
+  do {
+    const response = await client.send(new ScanCommand({
+      TableName: TABLE_NAME,
+      ExclusiveStartKey,
+    }));
+
+    items.push(...(response.Items || []));
+    ExclusiveStartKey = response.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+
+  return items.map(normalize);
+};
+
+class Enrollment {
+  constructor(data = {}) {
+    Object.assign(this, clone(data));
+    this.id = this.id || this._id || crypto.randomUUID();
+    this._id = this.id;
+  }
+
+  async save() {
+    const now = new Date().toISOString();
+    const item = {
+      ...clone(this),
+      id: this.id,
+      completedAt: this.completedAt || now,
+      createdAt: this.createdAt || now,
+      updatedAt: now,
+    };
+
+    delete item._id;
+
+    await client.send(new PutCommand({
+      TableName: TABLE_NAME,
+      Item: item,
+    }));
+
+    Object.assign(this, normalize(item));
+    return this;
+  }
+
+  toJSON() {
+    return normalize(clone(this));
+  }
+
+  static async findOne(query = {}) {
+    const enrollments = await scanAll();
+    
+    return enrollments.find(enrollment => {
+      return Object.entries(query).every(([key, value]) => {
+        return enrollment[key] === value;
+      });
+    }) || null;
+  }
+}
+
+module.exports = Enrollment;
