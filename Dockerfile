@@ -17,7 +17,6 @@ COPY middleware ./middleware
 COPY models ./models
 COPY routes ./routes
 COPY utils ./utils
-COPY public ./public
 
 USER node
 EXPOSE 5007
