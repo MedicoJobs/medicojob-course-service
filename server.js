@@ -15,6 +15,10 @@ app.use(express.json());
 // Serve static uploads
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Routes
 app.use('/courses', courseRoutes);
 
