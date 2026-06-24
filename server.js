@@ -29,6 +29,10 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5007;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Course Service running on port ${PORT}`);
 });
+
+server.keepAliveTimeout = 650 * 1000;
+server.headersTimeout = 651 * 1000;
+server.timeout = 30 * 60 * 1000;
